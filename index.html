@@ -7,77 +7,70 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-3 select-none">
 
-  <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-2xl max-w-sm w-full space-y-4 text-center">
+  <div class="bg-slate-800 border border-slate-700 p-4 rounded-2xl shadow-2xl w-full max-w-xs space-y-3 text-center">
     
-    <!-- Encabezado de Estado -->
+    <!-- Encabezado Popup -->
     <div class="flex items-center justify-between border-b border-slate-700 pb-2">
-      <span class="text-xs font-bold text-emerald-400"><i class="fa-solid fa-camera mr-1"></i> Escáner Activo</span>
-      <span id="tipo-marcaje" class="text-xs bg-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full font-bold"></span>
+      <span class="text-xs font-bold text-emerald-400"><i class="fa-solid fa-camera mr-1"></i> Escáner Facial</span>
+      <span id="tipo-marcaje" class="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-bold"></span>
     </div>
 
-    <!-- Visor de Vídeo de la Cámara -->
-    <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-slate-700">
+    <!-- Visor de Vídeo -->
+    <div class="relative w-full aspect-square bg-black rounded-xl overflow-hidden border border-slate-700">
       <video id="webcam" autoplay playsinline muted class="w-full h-full object-cover"></video>
       <canvas id="canvas" class="hidden"></canvas>
     </div>
 
-    <!-- Botón para Tomar Foto, Enviar y Cerrar Ventana -->
-    <button onclick="capturarEnviarYCerrar()" id="btn-captura" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-white shadow-lg transition flex items-center justify-center gap-2">
+    <!-- Botón Captura y Cierre -->
+    <button onclick="capturarEnviarYCerrar()" id="btn-captura" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-white shadow-lg text-xs transition flex items-center justify-center gap-2">
       <i class="fa-solid fa-circle-dot"></i>
       <span>Tomar Foto y Registrar</span>
     </button>
 
-    <p id="msg-estado" class="text-xs text-slate-400"></p>
+    <p id="msg-estado" class="text-[10px] text-slate-400"></p>
 
   </div>
 
   <script>
-    // ⚠️ COLOCA AQUÍ TU URL COMPLETA /exec OBTENIDA DE GOOGLE APPS SCRIPT
-    const URL_WEB_APP = "https://script.google.com/macros/s/AKfycbx3CFnCgj-N9deR4UmxNGsbHbzryY3_WCFVrnmpPaJX6-VapHxp_f1vAEOcrUFkDDUe3w/exec"; 
+    const URL_WEB_APP = "https://script.google.com/macros/s/AKfycbxuEaDFJTSA2w__q7cPnuyyU26CvOoJQbSayf96MAm6m-30_-BMQCaueWtG9TUNDh3rZw/exec";
 
     const video = document.getElementById('webcam');
-    
-    // Obtener la acción elegida desde los parámetros de la URL (?accion=Entrada)
     const urlParams = new URLSearchParams(window.location.search);
     const accion = urlParams.get('accion') || 'Entrada';
     document.getElementById('tipo-marcaje').innerText = accion;
 
-    // Encender la cámara directamente
     async function iniciarCamara() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, 
+          video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } }, 
           audio: false 
         });
         video.srcObject = stream;
       } catch (err) {
-        alert("No se pudo acceder a la cámara: " + err.message);
+        alert("Error de cámara: " + err.message);
       }
     }
 
     async function capturarEnviarYCerrar() {
-      if (!video.srcObject) return alert("La cámara aún no está lista.");
+      if (!video.srcObject) return alert("Cámara no lista.");
 
       const btn = document.getElementById('btn-captura');
       const msg = document.getElementById('msg-estado');
 
-      // 1. Tomar fotograma en el canvas
       const canvas = document.getElementById('canvas');
-      canvas.width = video.videoWidth || 640;
+      canvas.width = video.videoWidth || 480;
       canvas.height = video.videoHeight || 480;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const fotoBase64 = canvas.toDataURL('image/jpeg');
 
-      // 2. Estado de carga visual
       btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Guardando...`;
       btn.disabled = true;
-      msg.innerText = "Registrando marcaje y cerrando cámara...";
+      msg.innerText = "Registrando y cerrando ventana...";
 
       try {
-        // 3. Enviar datos por POST a la URL de Google Apps Script
         await fetch(URL_WEB_APP, {
           method: 'POST',
           mode: 'no-cors',
@@ -85,23 +78,21 @@
           body: JSON.stringify({ accion: accion, fotoBase64: fotoBase64 })
         });
 
-        // 4. Notificar a la pestaña principal del panel de Apps Script
         if (window.opener) {
           window.opener.postMessage({ status: 'completado', accion: accion }, '*');
         }
 
-        // 5. Detener cámara y cerrar la ventana emergente
         const stream = video.srcObject;
         if (stream) {
           stream.getTracks().forEach(track => track.stop());
         }
 
         setTimeout(() => {
-          window.close(); // Se cierra automáticamente
-        }, 500);
+          window.close(); // Cierra el Popup flotante
+        }, 300);
 
       } catch (err) {
-        alert("Error al enviar el marcaje: " + err.message);
+        alert("Error al guardar: " + err.message);
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-circle-dot"></i> <span>Tomar Foto y Registrar</span>`;
       }
