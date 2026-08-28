@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Escáner de Cámara</title>
+  <title>Cámara de Asistencia</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -11,18 +11,19 @@
 
   <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-2xl max-w-sm w-full space-y-4 text-center">
     
+    <!-- Encabezado de Estado -->
     <div class="flex items-center justify-between border-b border-slate-700 pb-2">
-      <span class="text-xs font-bold text-emerald-400"><i class="fa-solid fa-camera mr-1"></i> Cámara Activa</span>
-      <span id="tipo-marcaje" class="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-bold"></span>
+      <span class="text-xs font-bold text-emerald-400"><i class="fa-solid fa-camera mr-1"></i> Escáner Activo</span>
+      <span id="tipo-marcaje" class="text-xs bg-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full font-bold"></span>
     </div>
 
-    <!-- Transmisión de Cámara -->
+    <!-- Visor de Vídeo de la Cámara -->
     <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-slate-700">
       <video id="webcam" autoplay playsinline muted class="w-full h-full object-cover"></video>
       <canvas id="canvas" class="hidden"></canvas>
     </div>
 
-    <!-- Botón de Captura y Cierre Automatizado -->
+    <!-- Botón para Tomar Foto, Enviar y Cerrar Ventana -->
     <button onclick="capturarEnviarYCerrar()" id="btn-captura" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-white shadow-lg transition flex items-center justify-center gap-2">
       <i class="fa-solid fa-circle-dot"></i>
       <span>Tomar Foto y Registrar</span>
@@ -33,17 +34,17 @@
   </div>
 
   <script>
-    // ⚠️ REEMPLAZA CON TU URL /exec DE GOOGLE APPS SCRIPT
-    const URL_WEB_APP = "https://script.google.com/macros/s/TU_ID_DE_DESPLIEGUE/exec"; 
+    // ⚠️ COLOCA AQUÍ TU URL COMPLETA /exec OBTENIDA DE GOOGLE APPS SCRIPT
+    const URL_WEB_APP = "https://script.google.com/macros/s/AKfycbx3CFnCgj-N9deR4UmxNGsbHbzryY3_WCFVrnmpPaJX6-VapHxp_f1vAEOcrUFkDDUe3w/exec"; 
 
     const video = document.getElementById('webcam');
     
-    // Leer el parámetro 'accion' enviado desde Apps Script (Entrada/Salida)
+    // Obtener la acción elegida desde los parámetros de la URL (?accion=Entrada)
     const urlParams = new URLSearchParams(window.location.search);
     const accion = urlParams.get('accion') || 'Entrada';
     document.getElementById('tipo-marcaje').innerText = accion;
 
-    // Encender la cámara inmediatamente al cargar
+    // Encender la cámara directamente
     async function iniciarCamara() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -52,17 +53,17 @@
         });
         video.srcObject = stream;
       } catch (err) {
-        alert("Error al acceder a la cámara: " + err.message);
+        alert("No se pudo acceder a la cámara: " + err.message);
       }
     }
 
     async function capturarEnviarYCerrar() {
-      if (!video.srcObject) return alert("Cámara no disponible.");
+      if (!video.srcObject) return alert("La cámara aún no está lista.");
 
       const btn = document.getElementById('btn-captura');
       const msg = document.getElementById('msg-estado');
 
-      // 1. Capturar Fotograma del Vídeo
+      // 1. Tomar fotograma en el canvas
       const canvas = document.getElementById('canvas');
       canvas.width = video.videoWidth || 640;
       canvas.height = video.videoHeight || 480;
@@ -70,38 +71,39 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const fotoBase64 = canvas.toDataURL('image/jpeg');
 
-      // 2. Cambiar Estado Visual
+      // 2. Estado de carga visual
       btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Guardando...`;
       btn.disabled = true;
-      msg.innerText = "Registrando datos y cerrando ventana...";
+      msg.innerText = "Registrando marcaje y cerrando cámara...";
 
       try {
-        // 3. Enviar datos a Google Sheets vía POST
+        // 3. Enviar datos por POST a la URL de Google Apps Script
         await fetch(URL_WEB_APP, {
           method: 'POST',
           mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ accion: accion, fotoBase64: fotoBase64 })
         });
 
-        // 4. Notificar a la ventana principal de Apps Script si sigue abierta
+        // 4. Notificar a la pestaña principal del panel de Apps Script
         if (window.opener) {
           window.opener.postMessage({ status: 'completado', accion: accion }, '*');
         }
 
-        // 5. Apagar Cámara y Cerrar Ventana
+        // 5. Detener cámara y cerrar la ventana emergente
         const stream = video.srcObject;
-        const tracks = stream.getTracks();
-        tracks.forEach(track => track.stop());
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
 
         setTimeout(() => {
-          window.close(); // Cerrar la ventana emergente de GitHub
+          window.close(); // Se cierra automáticamente
         }, 500);
 
       } catch (err) {
-        alert("Error al enviar registro: " + err.message);
+        alert("Error al enviar el marcaje: " + err.message);
         btn.disabled = false;
-        btn.innerText = "Tomar Foto y Registrar";
+        btn.innerHTML = `<i class="fa-solid fa-circle-dot"></i> <span>Tomar Foto y Registrar</span>`;
       }
     }
 
