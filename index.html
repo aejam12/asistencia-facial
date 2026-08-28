@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Asistencia - Cámara Limpia</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
+
+  <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-2xl max-w-md w-full space-y-4">
+    <div class="flex items-center justify-between">
+      <h1 class="text-lg font-bold text-emerald-400"><i class="fa-solid fa-camera mr-2"></i> Asistencia Facial</h1>
+      <span id="estado-cam" class="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300">Iniciando...</span>
+    </div>
+    
+    <!-- Visor de Video Directo -->
+    <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-slate-700 flex items-center justify-center">
+      <video id="webcam" autoplay playsinline muted class="w-full h-full object-cover"></video>
+      <canvas id="canvas" class="hidden"></canvas>
+    </div>
+
+    <!-- Botón de Captura y Envío -->
+    <div class="space-y-2">
+      <button onclick="tomarFotoYEnviar()" id="btn-marcar" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-white shadow-lg transition flex items-center justify-center space-x-2">
+        <i class="fa-solid fa-check-circle"></i>
+        <span>Marcar Asistencia</span>
+      </button>
+    </div>
+
+    <!-- Mensajes de Estado -->
+    <div id="toast" class="hidden p-3 rounded-lg text-xs font-medium text-center"></div>
+  </div>
+
+  <script>
+    //  REEMPLAZA ESTA URL CON TU URL /exec DE GOOGLE APPS SCRIPT
+    const URL_WEB_APP = "TU_URL_DE_APPS_SCRIPT_AQUI"; 
+
+    const video = document.getElementById('webcam');
+    let fotoBase64 = "";
+
+    // Solicitar la cámara directamente al cargar la página
+    async function iniciarCamara() {
+      const estado = document.getElementById('estado-cam');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, 
+          audio: false 
+        });
+        video.srcObject = stream;
+        estado.innerText = "Cámara Activa";
+        estado.className = "text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300";
+      } catch (err) {
+        console.error("Error al acceder a la cámara:", err);
+        estado.innerText = "Error o Bloqueado";
+        estado.className = "text-xs px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300";
+        mostrarMensaje("No se pudo acceder a la cámara. Revisa los permisos del navegador.", "bg-rose-600");
+      }
+    }
+
+    function tomarFotoYEnviar() {
+      if (!video.srcObject) {
+        return mostrarMensaje("La cámara no está activa.", "bg-rose-600");
+      }
+
+      const canvas = document.getElementById('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      fotoBase64 = canvas.toDataURL('image/jpeg');
+
+      const btn = document.getElementById('btn-marcar');
+      btn.innerText = "Enviando...";
+      btn.disabled = true;
+
+      // Envío mediante petición POST directa al servidor de Apps Script
+      fetch(URL_WEB_APP, {
+        method: 'POST',
+        mode: 'no-cors', // Evita problemas de políticas CORS desde dominios externos
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'Entrada', fotoBase64: fotoBase64 })
+      })
+      .then(() => {
+        btn.innerText = "Marcar Asistencia";
+        btn.disabled = false;
+        mostrarMensaje("¡Marcaje enviado con éxito!", "bg-emerald-600");
+      })
+      .catch(err => {
+        btn.innerText = "Marcar Asistencia";
+        btn.disabled = false;
+        mostrarMensaje("Error al enviar: " + err.message, "bg-rose-600");
+      });
+    }
+
+    function mostrarMensaje(msg, bgClass) {
+      const toast = document.getElementById('toast');
+      toast.className = `p-3 rounded-lg text-xs font-medium text-center text-white ${bgClass}`;
+      toast.innerText = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 4000);
+    }
+
+    window.onload = iniciarCamara;
+  </script>
+</body>
+</html>
